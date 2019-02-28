@@ -1,4 +1,11 @@
 # star-jetframework
+# NOTE - READ THIS!!!!!
+This repo was created February 28, 2019 from:
+https://github.com/joelmazer/star-jetframework
+And will work for STAR libraries SL17f and earlier, but changes were made by star-soft to StPicoEvent and StPicoDstMaker packages.  This include updates of 3D vectors from type StThreeVectorF to TVector3
+
+
+# Framework details (non-inclusive)
 *this will be updated...*
 This is a framework for:
 * a FastJet wrapper, with various functionality 
