@@ -16,7 +16,7 @@
 #include "StarRoot/TAttr.h"
 
 #include "StFileManagerMaker.h"
-#include "StPicoEvent/StPicoDst.h"
+#include "StPicoDstMaker/StPicoDst.h"
 #include "StPicoDstMaker/StPicoDstMaker.h"
 
 
