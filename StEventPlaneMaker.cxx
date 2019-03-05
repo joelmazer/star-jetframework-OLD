@@ -252,6 +252,7 @@ StEventPlaneMaker::~StEventPlaneMaker()
   if(Psi2m) delete Psi2m;
   if(Psi2p) delete Psi2p;
   if(Delta_Psi2) delete Delta_Psi2;
+  if(Delta_Psi2old) delete Delta_Psi2old;
   if(Shift_delta_psi2) delete Shift_delta_psi2;
   if(Psi2_rcd) delete Psi2_rcd;
   if(Psi2_final) delete Psi2_final;
@@ -552,10 +553,11 @@ void StEventPlaneMaker::DeclareHistograms() {
   tpc_psi_fnl = new TH1F("tpc_psi_fnl", "tpc psi2 corrected", 288, -0.5*pi, 1.5*pi);
 
   // these were changed from [-2pi, 2pi] to [0, pi]
-  Psi2 = new TH1F("Psi2", "raw #Psi_{2} distribution", 144, 0., 1*pi);
-  Psi2m = new TH1F("Psi2m", "minus eta raw #Psi_{2} distribution", 144, 0., 1*pi);
-  Psi2p = new TH1F("Psi2p", "positive eta raw #Psi_{2} distribution", 144, 0., 1*pi);
-  Delta_Psi2 = new TH1F("Delta_Psi2", "#Delta #Psi_{2} distribution", 144, 0., 1*pi);
+  Psi2 = new TH1F("Psi2", "raw #Psi_{2} distribution", 144, 0., 1.*pi);
+  Psi2m = new TH1F("Psi2m", "minus eta raw #Psi_{2} distribution", 144, 0., 1.*pi);
+  Psi2p = new TH1F("Psi2p", "positive eta raw #Psi_{2} distribution", 144, 0., 1.*pi);
+  Delta_Psi2 = new TH1F("Delta_Psi2", "#Delta #Psi_{2} distribution", 144, -1.*pi, 1.*pi);
+  Delta_Psi2old = new TH1F("Delta_Psi2old", "#Delta #Psi_{2} distribution - old", 144, 0., 1.*pi);
   Shift_delta_psi2 = new TH1F("Shift_delta_psi2", "shift_delta_psi2 distribution", 4000, -8*pi, 8*pi);
   Psi2_rcd = new TH1F("Psi2_rcd", "recentered #Psi_{2} distribution", 144, 0., 1*pi);
   Psi2_final = new TH1F("Psi2_final", "final(shifted and recentered) #Psi_{2} distribution",2000,-4*pi, 4*pi);
@@ -754,6 +756,7 @@ void StEventPlaneMaker::WriteEventPlaneHistograms() {
   Psi2m->Write();
   Psi2p->Write();
   Delta_Psi2->Write();
+  Delta_Psi2old->Write();
   Shift_delta_psi2->Write();
   Psi2_rcd->Write();
   Psi2_final->Write();
@@ -1252,6 +1255,7 @@ void StEventPlaneMaker::SetEPSumw2() {
   Psi2m->Sumw2();
   Psi2p->Sumw2();
   Delta_Psi2->Sumw2();
+  Delta_Psi2old->Sumw2();
   Shift_delta_psi2->Sumw2();
   Psi2_rcd->Sumw2();
   Psi2_final->Sumw2();
@@ -2175,7 +2179,8 @@ Int_t StEventPlaneMaker::EventPlaneCal(int ref9, int region_vz, int n, int ptbin
   // fill TPC event plane histos
   Psi2->Fill(psi2);              // raw psi2
   Psi2_rcd->Fill(tPhi_rcd);      // recentered psi2
-  Delta_Psi2->Fill(psi2m-psi2p); // raw delta psi2
+  Delta_Psi2->Fill(psi2m-psi2p); // raw delta psi2 - full range
+  Delta_Psi2old->Fill(psi2m-psi2p); // raw delta psi2 - old
 
   double t_res = cos(2*(psi2m - psi2p)); // added
   res = 2.*(cos(2*(psi2m - psi2p)));

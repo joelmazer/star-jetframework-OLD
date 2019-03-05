@@ -664,12 +664,14 @@ int StJetMakerTask::Make()
 
   // ============================ CENTRALITY ============================== //
   // 10 14 21 29 40 54 71 92 116 145 179 218 263 315 373 441  // RUN 14 AuAu binning
-  int RunId = mPicoEvent->runId();
+  Int_t RunId = mPicoEvent->runId();
   double fBBCCoincidenceRate = mPicoEvent->BBCx();
   double fZDCCoincidenceRate = mPicoEvent->ZDCx();
   int grefMult = mPicoEvent->grefMult();
   Int_t centbin, cent16;
   Double_t refCorr2;
+
+  //cout<<"year: "<<mPicoEvent->year()<<"  day: "<<mPicoEvent->day()<<"   RunId: "<<RunId<<endl;
 
   if(!doppAnalysis) {
     // initialize event-by-event by RunID
