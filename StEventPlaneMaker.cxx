@@ -17,7 +17,6 @@
 // ################################################################
 
 #include "StEventPlaneMaker.h"
-
 #include "StMemStat.h"
 
 // ROOT includes
@@ -41,10 +40,7 @@
 #include "StRhoParameter.h"
 #include "StRho.h"
 #include "StJetMakerTask.h"
-#include "StPicoTrk.h"
 #include "StFemtoTrack.h"
-#include "StEPFlattener.h"
-#include "StCalibContainer.h"
 
 #include "runlistP16ij.h"
 #include "runlistP17id.h" // SL17i - Run14, now SL18b (March20)
@@ -106,9 +102,6 @@ StEventPlaneMaker::StEventPlaneMaker(const char* name, StPicoDstMaker *picoMaker
   ZDC_raw_comb = 0.; ZDC_raw_east = 0.; ZDC_raw_west = 0.;
   fJets = 0x0;
   fRunNumber = 0;
-  fEPcalibFileName = "$STROOT_CALIB/eventplaneFlat.root";
-  fFlatContainer = 0x0;
-  fTPCnFlat = 0x0; fTPCpFlat = 0x0; fBBCFlat = 0x0; fZDCFlat = 0x0;
   fEPTPCn = 0.; fEPTPCp = 0.; fEPTPC = 0.; fEPBBC = 0.; fEPZDC = 0.;
   fCalibFile = 0x0; fCalibFile2 = 0x0;
   mPicoDstMaker = 0x0;
@@ -132,7 +125,6 @@ StEventPlaneMaker::StEventPlaneMaker(const char* name, StPicoDstMaker *picoMaker
   doEventPlaneRes = kFALSE;
   doTPCptassocBin = kFALSE;
   fTPCptAssocBin = -99;
-  doReadCalibFile = kFALSE;
   fEmcTriggerEventType = 0; // see StJetFrameworkPicoBase::fEmcTriggerFlagEnum
   fMBEventType = 2;         // kVPDMB5
   fTriggerToUse = 0;        // kTriggerAny, see StJetFrameworkPicoBase::fTriggerEventTypeEnum
@@ -158,7 +150,6 @@ StEventPlaneMaker::StEventPlaneMaker(const char* name, StPicoDstMaker *picoMaker
   fJetMakerName = jetMakerName;
   fRhoMakerName = rhoMakerName;
 
-  InitParameters();
 }
 
 //----------------------------------------------------------------------------- 
@@ -173,10 +164,6 @@ StEventPlaneMaker::~StEventPlaneMaker()
   delete fHistEPTPCp;
   delete fHistEPBBC;
   delete fHistEPZDC;
-  delete fHistEPTPCnFlatten;
-  delete fHistEPTPCpFlatten;
-  delete fHistEPBBCFlatten;
-  delete fHistEPZDCFlatten;
   for(int i=0; i<9; i++){ // centrality
     delete hTrackPhi[i];
     delete hTrackPt[i];
@@ -426,10 +413,6 @@ void StEventPlaneMaker::DeclareHistograms() {
   fHistEPTPCp = new TH2F("fHistEPTPCp", "", 20, 0., 100., 72, -pi, pi);
   fHistEPBBC = new TH2F("fHistEPBBC", "", 20, 0., 100., 72, -pi, pi);
   fHistEPZDC = new TH2F("fHistEPZDC", "", 20, 0., 100., 72, -pi, pi);
-  fHistEPTPCnFlatten = new TH2F("fHistEPTPCnFlatten", "", 20, 0., 100., 72, -pi, pi);
-  fHistEPTPCpFlatten = new TH2F("fHistEPTPCpFlatten", "", 20, 0., 100., 72, -pi, pi);
-  fHistEPBBCFlatten = new TH2F("fHistEPBBCFlatten", "", 20, 0., 100., 72, -pi, pi);
-  fHistEPZDCFlatten = new TH2F("fHistEPZDCFlatten", "", 20, 0., 100., 72, -pi, pi);
 
   // track phi distribution for centrality
   for(int i=0; i<9; i++){ // centrality
@@ -690,10 +673,6 @@ void StEventPlaneMaker::WriteEventPlaneHistograms() {
   fHistEPTPCp->Write();
   fHistEPBBC->Write();
   fHistEPZDC->Write();
-  fHistEPTPCnFlatten->Write();
-  fHistEPTPCpFlatten->Write();
-  fHistEPBBCFlatten->Write();
-  fHistEPZDCFlatten->Write();
 
   // track phi distribution for centrality
   for(int i=0; i<9; i++){ // centrality
@@ -852,16 +831,6 @@ Int_t StEventPlaneMaker::Make() {
   Double_t fZDCCoincidenceRate = mPicoEvent->ZDCx();
   if(fDebugLevel == kDebugGeneralEvt) cout<<"RunID = "<<RunId<<"  fillID = "<<fillId<<"  eventID = "<<eventId<<endl; // what is eventID?
 
-  // ================= Event Plane flattening container ==============
-  // set up event plane flattening container  - not used
-  TObjArray *maps = static_cast<TObjArray*>(fFlatContainer->GetObject(fRunNumber,"eventplaneFlat"));
-  if(maps) {
-    fTPCnFlat = static_cast<StEPFlattener*>(maps->At(0));
-    fTPCpFlat = static_cast<StEPFlattener*>(maps->At(1));
-    fBBCFlat = static_cast<StEPFlattener*>(maps->At(2));
-    fZDCFlat = static_cast<StEPFlattener*>(maps->At(3));
-  }
-
   // ============================ CENTRALITY ============================== //
   // for only 14.5 GeV collisions from 2014 and earlier runs: refMult, for AuAu run14 200 GeV: grefMult 
   // https://github.com/star-bnl/star-phys/blob/master/StRefMultCorr/Centrality_def_refmult.txt
@@ -923,21 +892,8 @@ Int_t StEventPlaneMaker::Make() {
   // switches for Event Plane analysis
   Bool_t doEPAnalysis = kFALSE;  // set false by default
 
-  // switch on Run Flag to look for firing trigger specifically requested for given run period
-  switch(fRunFlag) {
-    case StJetFrameworkPicoBase::Run14_AuAu200 : // Run14 AuAu
-      //if(fEmcTriggerArr[fEmcTriggerEventType]) {
-      if(fHaveEmcTrigger) {
-        doEPAnalysis = kTRUE;
-      }
-      break;
-
-    case StJetFrameworkPicoBase::Run16_AuAu200 : // Run16 AuAu
-      if(fHaveEmcTrigger) {
-        doEPAnalysis = kTRUE;
-      }
-      break;
-  }
+  // if trigger fired, turn on doEPAnalysis
+  if(fHaveEmcTrigger) doEPAnalysis = kTRUE;
 
   // no need for switch for few checks
   if((fTriggerToUse == StJetFrameworkPicoBase::kTriggerMB) && (!fHaveMB5event) && (!fHaveMB30event)) return kStOK;  // MB triggered event
@@ -1213,10 +1169,6 @@ void StEventPlaneMaker::SetEPSumw2() {
   fHistEPTPCp->Sumw2();
   fHistEPBBC->Sumw2();
   fHistEPZDC->Sumw2();
-  fHistEPTPCnFlatten->Sumw2();
-  fHistEPTPCpFlatten->Sumw2();
-  fHistEPBBCFlatten->Sumw2();
-  fHistEPZDCFlatten->Sumw2();
   for(int i=0; i<9; i++){ // centrality
     hTrackPhi[i]->Sumw2();
     hTrackPt[i]->Sumw2();
@@ -1322,50 +1274,6 @@ void StEventPlaneMaker::SetEPSumw2() {
 */
 
 }
-
-//
-// Initialize parameters
-// __________________________________________________________________________________
-void StEventPlaneMaker::InitParameters()
-{
-  //AddToHistogramsName("Flow_");
-  // FIXME update this!
-  fFlatContainer = new StCalibContainer("eventplaneFlat");
-  fFlatContainer->InitFromFile("$STROOT_CALIB/eventplaneFlat.root", "eventplaneFlat");
-}  
-
-// TPC negative eta region event plane flattening
-// __________________________________________________________________________________
-Double_t StEventPlaneMaker::ApplyFlatteningTPCn(Double_t phi, Double_t c)
-{
-  if (fTPCnFlat) return fTPCnFlat->MakeFlat(phi,c);
-  return phi;
-}
-
-// TPC positive eta region event plane flattening
-// __________________________________________________________________________________
-Double_t StEventPlaneMaker::ApplyFlatteningTPCp(Double_t phi, Double_t c)
-{ 
-  if (fTPCpFlat) return fTPCpFlat->MakeFlat(phi,c);
-  return phi;
-}
-
-// BBC event plane flattening
-// __________________________________________________________________________________
-Double_t StEventPlaneMaker::ApplyFlatteningBBC(Double_t phi, Double_t c)
-{
-  if (fBBCFlat) return fBBCFlat->MakeFlat(phi,c);
-  return phi;
-}
-
-// ZDC event plane flattening
-// __________________________________________________________________________________
-Double_t StEventPlaneMaker::ApplyFlatteningZDC(Double_t phi, Double_t c)
-{
-  if (fZDCFlat) return fZDCFlat->MakeFlat(phi,c);
-  return phi;
-}
-
 // ________________________________________________________________________________________
 void StEventPlaneMaker::GetEventPlane(Bool_t flattenEP, Int_t n, Int_t method, Double_t ptcut, Int_t ptbin)
 { 
@@ -1596,24 +1504,6 @@ void StEventPlaneMaker::GetEventPlane(Bool_t flattenEP, Int_t n, Int_t method, D
   fHistEPBBC->Fill(fCentralityScaled, fEPBBC);
   fHistEPZDC->Fill(fCentralityScaled, fEPZDC);
 
-  // if we want to flatten event plane
-  if(flattenEP) {
-    fEPTPCn = ApplyFlatteningTPCn(fEPTPCn, fCentralityScaled);
-    fEPTPCp = ApplyFlatteningTPCp(fEPTPCp, fCentralityScaled);
-    fEPBBC = ApplyFlatteningBBC(fEPBBC, fCentralityScaled);
-    fEPZDC = ApplyFlatteningZDC(fEPZDC, fCentralityScaled);
-    //if (fEPTPC != -999.) fEPTPC = ApplyFlatteningTPC(fEPTPC, fCentralityScaled);
-    while (fEPTPCn<0.) fEPTPCn+=TMath::Pi(); while (fEPTPCn>TMath::Pi()) fEPTPCn-=TMath::Pi();
-    while (fEPTPCp<0.) fEPTPCp+=TMath::Pi(); while (fEPTPCp>TMath::Pi()) fEPTPCp-=TMath::Pi();
-    while (fEPBBC<0.)  fEPBBC+=TMath::Pi();  while (fEPBBC>TMath::Pi())  fEPBBC-=TMath::Pi();
-    while (fEPZDC<0.)  fEPZDC+=TMath::Pi();  while (fEPZDC>TMath::Pi())  fEPZDC-=TMath::Pi();
-
-    fHistEPTPCnFlatten->Fill(fCentralityScaled, fEPTPCn);
-    fHistEPTPCpFlatten->Fill(fCentralityScaled, fEPTPCp);
-    fHistEPBBCFlatten->Fill(fCentralityScaled, fEPBBC);
-    fHistEPZDCFlatten->Fill(fCentralityScaled, fEPZDC);
-  }
-
 }
 
 // 1) get the binning for: ref9 and region_vz
@@ -1728,37 +1618,6 @@ Int_t StEventPlaneMaker::BBC_EP_Cal(int ref9, int region_vz, int n) { //refmult,
       sumcos_W -= bbc_center_wx[RunId_Order];
       sumsin_W -= bbc_center_wy[RunId_Order];
     }
-
-/*
-    // read from file
-    if(fCalibFile && doReadCalibFile){
-      // Method 2: reading values from *.root files
-      TProfile* htempBBC_center_ex = (TProfile*)fCalibFile->Get("hBBC_center_ex");
-      htempBBC_center_ex->SetName("htempBBC_center_ex");
-      sumcos_E -= htempBBC_center_ex->GetBinContent(RunId_Order + 1);
-
-      TProfile* htempBBC_center_ey = (TProfile*)fCalibFile->Get("hBBC_center_ey");
-      htempBBC_center_ey->SetName("htempBBC_center_ey");
-      sumsin_E -= htempBBC_center_ey->GetBinContent(RunId_Order + 1);
-
-      TProfile* htempBBC_center_wx = (TProfile*)fCalibFile->Get("hBBC_center_wx");
-      htempBBC_center_wx->SetName("htempBBC_center_wx");
-      sumcos_W -= htempBBC_center_wx->GetBinContent(RunId_Order + 1);
-
-      TProfile* htempBBC_center_wy = (TProfile*)fCalibFile->Get("hBBC_center_wy");
-      htempBBC_center_wy->SetName("htempBBC_center_wy");
-      sumsin_W -= htempBBC_center_wy->GetBinContent(RunId_Order + 1);
-
-      // test statement
-      //cout<<"RunID_Order = "<<RunId_Order + 1<<"  hBBC_center_ex max = "<<htempBBC_center_ex->GetMaximum()<<"  bin# = "<<htempBBC_center_ex->GetMaximumBin()<<endl;
-      // delete temp histos
-      delete htempBBC_center_ex;
-      delete htempBBC_center_ey;
-      delete htempBBC_center_wx;
-      delete htempBBC_center_wy;
-    }
-*/
-
   }
 
   // fill east/west BBC angles
@@ -1819,27 +1678,6 @@ Int_t StEventPlaneMaker::BBC_EP_Cal(int ref9, int region_vz, int n) { //refmult,
         bbc_delta_psi += (bbc_shift_A[ref9][region_vz][nharm-1] * cos(2*nharm*bPhi_rcd) +
                           bbc_shift_B[ref9][region_vz][nharm-1] * sin(2*nharm*bPhi_rcd));
       }
-
-/*
-      // reading in from file
-      if(fCalibFile2 && doReadCalibFile){
-        // Method 2: load from *.root calibration file
-        TProfile* htempBBC_ShiftA = (TProfile*)fCalibFile2->Get(Form("hBBC_shift_A%i_%i", ref9, region_vz));
-        htempBBC_ShiftA->SetName(Form("htempBBC_ShiftA%i_%i", ref9, region_vz));
-        bbc_shift_Aval = htempBBC_ShiftA->GetBinContent(nharm);
-
-        TProfile* htempBBC_ShiftB = (TProfile*)fCalibFile2->Get(Form("hBBC_shift_B%i_%i", ref9, region_vz));
-        htempBBC_ShiftB->SetName(Form("htempBBC_ShiftB%i_%i", ref9, region_vz));
-        bbc_shift_Bval = htempBBC_ShiftB->GetBinContent(nharm);
-
-        // perform 'shift' to BBC event plane angle
-        bbc_delta_psi += (bbc_shift_Aval * cos(2*nharm*bPhi_rcd) + bbc_shift_Bval * sin(2*nharm*bPhi_rcd));
-        // delete temp histos
-        delete htempBBC_ShiftA;
-        delete htempBBC_ShiftB;
-      }
-*/
-
     }
 
   }
@@ -2063,27 +1901,6 @@ Int_t StEventPlaneMaker::ZDC_EP_Cal(int ref9, int region_vz, int n) {
         zdc_delta_psi += (zdc_shift_A[ref9][region_vz][nharm-1] * cos(2*nharm*zPhi_rcd) +
                           zdc_shift_B[ref9][region_vz][nharm-1] * sin(2*nharm*zPhi_rcd));
       }
-
-/*
-      // reading in from file
-      if(fCalibFile2 && doReadCalibFile){
-        // Method 2: load from *.root calibration file
-        TProfile* htempZDC_ShiftA = (TProfile*)fCalibFile2->Get(Form("hZDC_shift_A%i_%i", ref9, region_vz));
-        htempZDC_ShiftA->SetName(Form("htempZDC_ShiftA%i_%i", ref9, region_vz));
-        zdc_shift_Aval = htempZDC_ShiftA->GetBinContent(nharm);
-
-        TProfile* htempZDC_ShiftB = (TProfile*)fCalibFile2->Get(Form("hZDC_shift_B%i_%i", ref9, region_vz));
-        htempZDC_ShiftB->SetName(Form("htempZDC_ShiftB%i_%i", ref9, region_vz));
-        zdc_shift_Bval = htempZDC_ShiftB->GetBinContent(nharm);
-
-        // perform 'shift' to ZDC event plane angle
-        zdc_delta_psi += (zdc_shift_Aval * cos(2*nharm*zPhi_rcd) + zdc_shift_Bval * sin(2*nharm*zPhi_rcd));
-        // delete temp histos
-        delete htempZDC_ShiftA;
-        delete htempZDC_ShiftB;
-      }      
-*/
-
     }
   }
 
@@ -2218,33 +2035,6 @@ Double_t StEventPlaneMaker::ZDCSMD_GetPosition(int id_order, int eastwest, int v
       mZDCSMDCenterwx = zdc_center_wx[id_order];
       mZDCSMDCenterwy = zdc_center_wy[id_order];
     }
-
-/*
-    // reading in from file
-    if(fCalibFile && doReadCalibFile){
-      // get corrections from histograms of calibration .root file
-      TProfile* htempZDC_center_ex = (TProfile*)fCalibFile->Get("hZDC_center_ex");
-      htempZDC_center_ex->SetName("htempZDC_center_ex");
-      mZDCSMDCenterex = htempZDC_center_ex->GetBinContent(id_order + 1);
-
-      TProfile* htempZDC_center_ey = (TProfile*)fCalibFile->Get("hZDC_center_ey");
-      htempZDC_center_ey->SetName("htempZDC_center_ey");
-      mZDCSMDCenterey = htempZDC_center_ey->GetBinContent(id_order + 1);
-
-      TProfile* htempZDC_center_wx = (TProfile*)fCalibFile->Get("hZDC_center_wx");
-      htempZDC_center_wx->SetName("htempZDC_center_wx");
-      mZDCSMDCenterwx = htempZDC_center_wx->GetBinContent(id_order + 1);
-
-      TProfile* htempZDC_center_wy = (TProfile*)fCalibFile->Get("hZDC_center_wy");
-      htempZDC_center_wy->SetName("htempZDC_center_wy");
-      mZDCSMDCenterwy = htempZDC_center_wy->GetBinContent(id_order + 1);
-
-      delete htempZDC_center_ex;
-      delete htempZDC_center_ey;
-      delete htempZDC_center_wx;
-      delete htempZDC_center_wy;
-    }
-*/
 
   }
 
@@ -2432,27 +2222,6 @@ Int_t StEventPlaneMaker::EventPlaneCal(int ref9, int region_vz, int n, int ptbin
         tpc_delta_psi += (tpc_shift_N[ref9][region_vz][nharm-1] * cos(2*nharm*tPhi_rcd) +
                           tpc_shift_P[ref9][region_vz][nharm-1] * sin(2*nharm*tPhi_rcd));
       }
-
-/*
-      // reading in from file
-      // started correcting names..
-      if(fCalibFile2 && doReadCalibFile){
-        // Method 2: load from *.root calibration file
-        TProfile* htempTPC_ShiftA = (TProfile*)fCalibFile2->Get(Form("hTPC_shift_N%i_%i", ref9, region_vz));
-        htempTPC_ShiftA->SetName(Form("htempTPC_ShiftA%i_%i", ref9, region_vz));
-        tpc_shift_Aval = htempTPC_ShiftA->GetBinContent(nharm);
-
-        TProfile* htempTPC_ShiftB = (TProfile*)fCalibFile2->Get(Form("hTPC_shift_P%i_%i", ref9, region_vz));
-        htempTPC_ShiftB->SetName(Form("htempTPC_ShiftB%i_%i", ref9, region_vz));
-        tpc_shift_Bval = htempTPC_ShiftB->GetBinContent(nharm);
-
-        // perform 'shift' to TPC event plane angle
-        tpc_delta_psi += (tpc_shift_Aval * cos(2*nharm*tPhi_rcd) + tpc_shift_Bval * sin(2*nharm*tPhi_rcd));
-        // delete temp histos
-        delete htempTPC_ShiftA;
-        delete htempTPC_ShiftB;
-      }
-*/
 
     } // nharm loop
   } // correction switch
@@ -2698,31 +2467,11 @@ void StEventPlaneMaker::QvectorCal(int ref9, int region_vz, int n, int ptbin) {
           x -= tpc_center_Qpx[ref9][region_vz];
           y -= tpc_center_Qpy[ref9][region_vz];
 
-            // reading in from file
-//          if(fCalibFile && doReadCalibFile){
-//            // Method 2: from *.root calibration file
-//            TProfile* hTPC_center_p = (TProfile*)fCalibFile->Get(Form("Q2_p%i_%i", ref9, region_vz));
-//            hTPC_center_p->SetName("hTPC_center_p");
-//            x -= hTPC_center_p->GetBinContent(1); // bin1 = x-vector
-//            y -= hTPC_center_p->GetBinContent(2); // bin2 = y-vector
-//            delete hTPC_center_p;
-//          }
-
         } // positive eta
         if(eta < 0){ // NEGATIVE region
           // Method 1: from function
           x -= tpc_center_Qnx[ref9][region_vz];
           y -= tpc_center_Qny[ref9][region_vz];
-
-            // reading in from file
-//          if(fCalibFile && doReadCalibFile){
-//            // Method 2: from *.root calibration file
-//            TProfile* hTPC_center_m = (TProfile*)fCalibFile->Get(Form("Q2_m%i_%i", ref9, region_vz));
-//            hTPC_center_m->SetName("hTPC_center_m");
-//            x -= hTPC_center_m->GetBinContent(1); // bin1 = x-vector
-//            y -= hTPC_center_m->GetBinContent(2); // bin2 = y-vector
-//            delete hTPC_center_m;
-//          }
 
         } // negative eta
       } // eta regions

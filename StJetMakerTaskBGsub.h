@@ -10,11 +10,10 @@
 
 // for clusters
 #include "StEmcUtil/geometry/StEmcGeom.h"
-#include "StEmcUtil/projection/StEmcPosition.h"
-#include "StMuDSTMaker/COMMON/StMuDst.h"
+//#include "StEmcUtil/projection/StEmcPosition.h"
+//#include "StMuDSTMaker/COMMON/StMuDst.h"
 class StEmcGeom;
-class StEmcCluster;
-class StEmcCollection;
+class StEmcPosition2;
 
 // ROOT classes
 class TClonesArray;
@@ -182,6 +181,8 @@ class StJetMakerTaskBGsub : public StMaker {
   Double_t               GetMaxTrackPt();
   Int_t                  FastJetBGsub();
 
+  void                   SetSumw2(); // set errors weights 
+
   // may not need any of these except fill jet branch if I want 2 different functions
   void                   FillJetBranch();
   void                   FillJetBGBranch();
@@ -295,15 +296,16 @@ class StJetMakerTaskBGsub : public StMaker {
 
   // TEST ---
   StEmcGeom       *mGeom;
-  StEmcCollection *mEmcCol;
   
   static const Int_t     fgkConstIndexShift;      //!contituent index shift
 
  private:
-  StMuDst        *mu;            // muDst object
   StPicoDstMaker *mPicoDstMaker; // PicoDstMaker object
   StPicoDst      *mPicoDst;      // PicoDst object
   StPicoEvent    *mPicoEvent;    // PicoEvent object
+
+  // position object
+  StEmcPosition2 *mEmcPosition;
 
   // centrality objects
   StRefMultCorr* grefmultCorr;
@@ -312,8 +314,20 @@ class StJetMakerTaskBGsub : public StMaker {
   Bool_t         mTowerStatusArr[4801];
 
   // histograms
+  TH1F           *fHistMultiplicity;//!
   TH1F           *fHistCentrality;//!
   TH1F           *fHistFJRho;//!
+
+  TH1F           *fHistNTrackvsPt;//!
+  TH1F           *fHistNTrackvsPhi;//!
+  TH1F           *fHistNTrackvsEta;//!
+  TH2F           *fHistNTrackvsPhivsEta;//!
+  TH1F           *fHistNTowervsID;//!
+  TH1F           *fHistNTowervsE;//!
+  TH1F           *fHistNTowervsEt;//!
+  TH1F           *fHistNTowervsPhi;//!
+  TH1F           *fHistNTowervsEta;//!
+  TH2F           *fHistNTowervsPhivsEta;//!
 
   TH1F           *fHistJetNTrackvsPt;//!
   TH1F           *fHistJetNTrackvsPhi;//!

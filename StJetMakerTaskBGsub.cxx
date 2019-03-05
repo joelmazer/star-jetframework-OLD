@@ -13,6 +13,7 @@
 #include "StJetMakerTaskBGsub.h"
 
 // root classes
+#include "TROOT.h"
 #include <TChain.h>
 #include <TClonesArray.h>
 #include "TH1F.h"
@@ -41,16 +42,11 @@
 #include "StPicoConstants.h"
 
 // for clusters
-#include "StMuDSTMaker/COMMON/StMuTrack.h"
-//StEmc
-#include "StEmcClusterCollection.h"
-#include "StEmcCollection.h"
-#include "StEmcCluster.h"
-#include "StEmcPoint.h"
 #include "StEmcUtil/geometry/StEmcGeom.h"
-#include "StEmcUtil/projection/StEmcPosition.h"
-class StEmcPosition;
-class StEEmcCluster;
+//#include "StEmcUtil/projection/StEmcPosition.h"  // old
+#include "StEmcPosition2.h"
+//class StEmcPosition; // old
+//class StEmcPosition2;
 
 // jet class and fastjet wrapper
 #include "StJet.h"
@@ -143,11 +139,10 @@ StJetMakerTaskBGsub::StJetMakerTaskBGsub() :
   fJetsConstit(0x0),
   fJetsConstitBGsub(0x0),
   mGeom(StEmcGeom::instance("bemc")),
-  mEmcCol(0),
-  mu(0x0),
   mPicoDstMaker(0x0),
   mPicoDst(0x0),
   mPicoEvent(0x0),
+  mEmcPosition(0x0),
   grefmultCorr(0x0)
 {
   // Default constructor.
@@ -233,11 +228,10 @@ StJetMakerTaskBGsub::StJetMakerTaskBGsub(const char *name, double mintrackPt = 0
   fJetsConstit(0x0),
   fJetsConstitBGsub(0x0),
   mGeom(StEmcGeom::instance("bemc")),
-  mEmcCol(0),
-  mu(0x0),
   mPicoDstMaker(0x0),
   mPicoDst(0x0),
   mPicoEvent(0x0),
+  mEmcPosition(0x0),
   grefmultCorr(0x0)
 {
   // Standard constructor.
@@ -258,8 +252,20 @@ StJetMakerTaskBGsub::StJetMakerTaskBGsub(const char *name, double mintrackPt = 0
 StJetMakerTaskBGsub::~StJetMakerTaskBGsub()
 {
   // Destructor
+  if(fHistMultiplicity)        delete fHistMultiplicity;
   if(fHistCentrality)          delete fHistCentrality;
   if(fHistFJRho)               delete fHistFJRho;
+
+  if(fHistNTrackvsPt)          delete fHistNTrackvsPt;
+  if(fHistNTrackvsPhi)         delete fHistNTrackvsPhi;
+  if(fHistNTrackvsEta)         delete fHistNTrackvsEta;
+  if(fHistNTrackvsPhivsEta)    delete fHistNTrackvsPhivsEta;
+  if(fHistNTowervsID)          delete fHistNTowervsID;
+  if(fHistNTowervsE)           delete fHistNTowervsE;
+  if(fHistNTowervsEt)          delete fHistNTowervsEt;
+  if(fHistNTowervsPhi)         delete fHistNTowervsPhi;
+  if(fHistNTowervsEta)         delete fHistNTowervsEta;
+  if(fHistNTowervsPhivsEta)    delete fHistNTowervsPhivsEta;
 
   if(fHistJetNTrackvsPt)       delete fHistJetNTrackvsPt;
   if(fHistJetNTrackvsPhi)      delete fHistJetNTrackvsPhi;
@@ -283,6 +289,8 @@ StJetMakerTaskBGsub::~StJetMakerTaskBGsub()
 
   if(fHistQATowIDvsEta)        delete fHistQATowIDvsEta;
   if(fHistQATowIDvsPhi)        delete fHistQATowIDvsPhi;
+
+  delete mEmcPosition;
 }
 
 //
@@ -330,6 +338,9 @@ Int_t StJetMakerTaskBGsub::Init() {
   // may need array (name hard-coded, Feb20, 2018)
   fJetsConstit = new TClonesArray("StPicoTrack");
   fJetsConstit->SetName("JetConstituents");
+
+  // position object for Emc
+  mEmcPosition = new StEmcPosition2();
 
   // ============================ set jet parameters for fastjet wrapper  =======================
   // recombination schemes:
@@ -471,11 +482,35 @@ Int_t StJetMakerTaskBGsub::Finish() {
 //________________________________________________________________________
 void StJetMakerTaskBGsub::DeclareHistograms() {
     // declare histograms
+
+    // constants
     double pi = 1.0*TMath::Pi();
 
+    // histogram settings
+    double kHistMultMax = 800.;
+    int kHistMultBins = 400;
+
+    // pp specific settings
+    if(doppAnalysis) {
+      kHistMultMax = 100.;
+      kHistMultBins = 100.;
+    }
+
     //fHistEventCounter = new TH1F("fHistEventCounter", "Event counter", 10, 0.5, 10.5);
+    fHistMultiplicity = new TH1F("fHistMultiplicity", "No. events vs multiplicity", kHistMultBins, 0, kHistMultMax);
     fHistCentrality = new TH1F("fHistCentrality", "No. events vs centrality", 20, 0, 100);    
     fHistFJRho = new TH1F("fHistFJRho", "Underlying event energy density via FastJet", 200, 0, 50);
+
+    fHistNTrackvsPt = new TH1F("fHistNTrackvsPt", "# track vs p_{T}", 150, 0., 30.);
+    fHistNTrackvsPhi = new TH1F("fHistNTrackvsPhi", "# track vs #phi", 72, 0., 2*pi);
+    fHistNTrackvsEta = new TH1F("fHistNTrackvsEta", "# track vs #eta", 40, -1.0, 1.0);
+    fHistNTrackvsPhivsEta = new TH2F("fHistNTrackvsPhivsEta", "# track vs #phi vs #eta", 144, 0, 2*pi, 20, -1.0, 1.0);
+    fHistNTowervsID = new TH1F("fHistNTowervsID", "# tower vs tower id", 4800, 0.5, 4800.5);
+    fHistNTowervsE = new TH1F("fHistNTowervsE", "# tower vs energy", 100, 0., 20.0);
+    fHistNTowervsEt = new TH1F("fHistNTowervsEt", "# tower vs transverse energy", 100, 0., 20.0);
+    fHistNTowervsPhi = new TH1F("fHistNTowervsPhi", "# tower vs #phi", 144, 0., 2*pi);
+    fHistNTowervsEta = new TH1F("fHistNTowervsEta", "# tower vs #eta", 40, -1.0, 1.0);
+    fHistNTowervsPhivsEta = new TH2F("fHistNTowervsPhivsEta", "# vs #phi vs #eta", 144, 0, 2*pi, 20, -1.0, 1.0);
 
     fHistJetNTrackvsPt = new TH1F("fHistJetNTrackvsPt", "Jet track constituents vs p_{T}", 150, 0., 30.);
     fHistJetNTrackvsPhi = new TH1F("fHistJetNTrackvsPhi", "Jet track constituents vs #phi", 72, 0., 2*pi);
@@ -505,8 +540,20 @@ void StJetMakerTaskBGsub::DeclareHistograms() {
 
 void StJetMakerTaskBGsub::WriteHistograms() {
   // write histograms
+  fHistMultiplicity->Write();
   fHistCentrality->Write();
   fHistFJRho->Write();
+
+  fHistNTrackvsPt->Write();
+  fHistNTrackvsPhi->Write();
+  fHistNTrackvsEta->Write();
+  fHistNTrackvsPhivsEta->Write();
+  fHistNTowervsID->Write();
+  fHistNTowervsE->Write();
+  fHistNTowervsEt->Write();
+  fHistNTowervsPhi->Write();
+  fHistNTowervsEta->Write();
+  fHistNTowervsPhivsEta->Write();
 
   fHistJetNTrackvsPt->Write();
   fHistJetNTrackvsPhi->Write();
@@ -547,7 +594,7 @@ int StJetMakerTaskBGsub::Make()
   fJets->Delete();
   fJetsBGsub->Delete();
 
-  // April9 test - ZERO these out for double checking they aren't set
+  // ZERO these out for double checking they aren't set
   for(int i = 0; i < 4801; i++) {
     mTowerMatchTrkIndex[i] = 0;
     mTowerStatusArr[i] = kFALSE;
@@ -594,6 +641,7 @@ int StJetMakerTaskBGsub::Make()
   double fZDCCoincidenceRate = mPicoEvent->ZDCx();
   int grefMult = mPicoEvent->grefMult();
   Int_t centbin, cent16;
+  Double_t refCorr2;
 
   if(!doppAnalysis) {
     // initialize event-by-event by RunID
@@ -601,16 +649,19 @@ int StJetMakerTaskBGsub::Make()
     if(doUseBBCCoincidenceRate) { grefmultCorr->initEvent(grefMult, zVtx, fBBCCoincidenceRate); } // default
     else{ grefmultCorr->initEvent(grefMult, zVtx, fZDCCoincidenceRate); }
 
+    // calculate corrected multiplicity: 
+    // Double_t getRefMultCorr(const UShort_t RefMult, const Double_t z, const Double_t zdcCoincidenceRate, const UInt_t flag=2) const ;
+    // flag=0:  Luminosity only
+    // flag=1:  z-vertex only
+    // flag=2:  full correction (default)
+    if(doUseBBCCoincidenceRate) { refCorr2 = grefmultCorr->getRefMultCorr(grefMult, zVtx, fBBCCoincidenceRate, 2);
+    } else{ refCorr2 = grefmultCorr->getRefMultCorr(grefMult, zVtx, fZDCCoincidenceRate, 2); }
+
     // get centrality bin: either 0-7 or 0-15
     cent16 = grefmultCorr->getCentralityBin16();
-    if(cent16 == -1) return kStOk; // - this is for lowest multiplicity events 80%+ centrality, cut on them
 
     // re-order binning to be from central -> peripheral
-    centbin = GetCentBin(cent16, 16);  // 0-16
-
-    // calculate corrected multiplicity
-    if(doUseBBCCoincidenceRate) { grefmultCorr->getRefMultCorr(grefMult, zVtx, fBBCCoincidenceRate, 2);
-    } else{ grefmultCorr->getRefMultCorr(grefMult, zVtx, fZDCCoincidenceRate, 2); }
+    centbin = GetCentBin(cent16, 16);  // 0-15
 
   } else { // for pp
     centbin = 0, cent16 = 0;
@@ -618,6 +669,14 @@ int StJetMakerTaskBGsub::Make()
 
   // cut on unset centrality, > 80%
   if(cent16 == -1) return kStWarn; // maybe kStOk; - this is for lowest multiplicity events 80%+ centrality, cut on them
+
+  // event activity - compensate for pp or AuAu
+  double kEventActivity = (doppAnalysis) ? (double)grefMult : refCorr2;
+
+  // multiplicity histogram
+  fHistMultiplicity->Fill(kEventActivity);
+
+  // scaled centrality - based on 5% bins
   double centralityScaled = centbin*5.0;
   fHistCentrality->Fill(centralityScaled);
 
@@ -671,9 +730,6 @@ void StJetMakerTaskBGsub::FindJets()
   fjw.Clear();
   fFull_Event.clear();
 
-  // initialize Emc position objects
-  StEmcPosition *mPosition = new StEmcPosition();
-
   // assume neutral pion mass
   // additional parameters constructed
   double pi = 1.0*TMath::Pi();
@@ -700,12 +756,23 @@ void StJetMakerTaskBGsub::FindJets()
       }
 
       // track variables
+      double pt = mTrkMom.perp();
+      double phi = mTrkMom.phi();
+      if(phi < 0.0)    phi += 2.0*pi;
+      if(phi > 2.0*pi) phi -= 2.0*pi;
+      double eta = mTrkMom.pseudoRapidity();
       double px = mTrkMom.x();
       double py = mTrkMom.y();
       double pz = mTrkMom.z();
       double p = mTrkMom.mag();
       double energy = 1.0*TMath::Sqrt(p*p + pi0mass*pi0mass);
       short charge = trk->charge();         
+
+      // fill some QA histograms
+      fHistNTrackvsPt->Fill(pt);
+      fHistNTrackvsPhi->Fill(phi);
+      fHistNTrackvsEta->Fill(eta);
+      fHistNTrackvsPhivsEta->Fill(phi, eta);
 
       // send track info to FJ wrapper
       //fjw.AddInputVector(px, py, pz, p, iTracks);    // p -> E
@@ -763,15 +830,25 @@ void StJetMakerTaskBGsub::FindJets()
       if(towerID < 0) continue; // double check these aren't still in the event list
 
       // cluster and tower position - from vertex and ID: shouldn't need additional eta correction
-      StThreeVectorF towerPosition = mPosition->getPosFromVertex(mVertex, towerID);
+      StThreeVectorF towerPosition = mEmcPosition->getPosFromVertex(mVertex, towerID);
       double towerPhi = towerPosition.phi();
       if(towerPhi < 0)    towerPhi += 2.0*pi;
       if(towerPhi > 2*pi) towerPhi -= 2.0*pi;
       double towerEta = towerPosition.pseudoRapidity();
+      //int towerADC = tower->adc();
       double towerEunCorr = tower->energy();  // uncorrected energy
       double towerE = tower->energy();        // corrected energy (hadronically - done below)
+      double towEt = towerE / (1.0*TMath::CosH(towerEta));
 
-      // perform tower cuts
+      // fill QA histos for jet towers  
+      fHistNTowervsID->Fill(towerID);
+      fHistNTowervsE->Fill(towerE);
+      fHistNTowervsEt->Fill(towEt);
+      fHistNTowervsPhi->Fill(towerPhi);
+      fHistNTowervsEta->Fill(towerEta);
+      fHistNTowervsPhivsEta->Fill(towerPhi, towerEta);
+
+      // April9, need to perform hadronic correction again since StBTowHit object is not updated
       // if tower was not matched to an accepted track, use it for jet by itself if > 0.2 GeV
       if(mTowerStatusArr[towerID]) {
         StPicoTrack* trk = static_cast<StPicoTrack*>(mPicoDst->track( mTowerMatchTrkIndex[towerID] ));
@@ -915,9 +992,6 @@ void StJetMakerTaskBGsub::FillJetConstituents(StJet *jet, std::vector<fastjet::P
   double pi = 1.0*TMath::Pi();
   double pi0mass = Pico::mMass[0]; // GeV
 
-  // get EMCal position
-  StEmcPosition *mPosition = new StEmcPosition();
-
   // initially set track and cluster constituent sizes
   jet->SetNumberOfTracks(constituents.size());
   jet->SetNumberOfClusters(constituents.size());
@@ -986,7 +1060,9 @@ void StJetMakerTaskBGsub::FillJetConstituents(StJet *jet, std::vector<fastjet::P
 
         // cluster and tower position - from vertex and ID: shouldn't need additional eta correction
         int towerID = tower->id();
-        StThreeVectorF towerPosition = mPosition->getPosFromVertex(mVertex, towerID);
+        if(towerID < 0) continue;
+
+        StThreeVectorF towerPosition = mEmcPosition->getPosFromVertex(mVertex, towerID);
         double towerPhi = towerPosition.phi();
         double towerEta = towerPosition.pseudoRapidity();
         double towEuncorr = tower->energy();
@@ -1157,14 +1233,10 @@ Bool_t StJetMakerTaskBGsub::AcceptJetTrack(StPicoTrack *trk, Float_t B, StThreeV
   // passed all above cuts - keep track and fill input vector to fastjet
   return kTRUE;
 }
-
 //
 // Tower Quality Cuts
 //________________________________________________________________________
 Bool_t StJetMakerTaskBGsub::AcceptJetTower(StPicoBTowHit *tower) {
-  // get EMCal position
-  StEmcPosition *mPosition = new StEmcPosition();
-
   // constants:
   double pi = 1.0*TMath::Pi();
 
@@ -1175,7 +1247,7 @@ Bool_t StJetMakerTaskBGsub::AcceptJetTower(StPicoBTowHit *tower) {
   if(towerID < 0) return kFALSE; 
 
   // cluster and tower position - from vertex and ID: shouldn't need additional eta correction
-  StThreeVectorF towerPosition = mPosition->getPosFromVertex(mVertex, towerID);
+  StThreeVectorF towerPosition = mEmcPosition->getPosFromVertex(mVertex, towerID);
   double phi = towerPosition.phi();
   if(phi < 0)    phi += 2.0*pi;
   if(phi > 2*pi) phi -= 2.0*pi;
@@ -1315,12 +1387,9 @@ Bool_t StJetMakerTaskBGsub::SelectAnalysisCentralityBin(Int_t centbin, Int_t fCe
 
   return doAnalysis;
 }
-
+//
 //________________________________________________________________________________________________________
 Bool_t StJetMakerTaskBGsub::GetMomentum(StThreeVectorF &mom, const StPicoBTowHit* tower, Double_t mass) const {
-  // initialize Emc position objects
-  StEmcPosition *Position = new StEmcPosition();
-
   // vertex components - only need if below method is used
   // mGeom3->getEtaPhi(towerID,tEta,tPhi);
   //double xVtx = mVertex.x();
@@ -1332,9 +1401,10 @@ Bool_t StJetMakerTaskBGsub::GetMomentum(StThreeVectorF &mom, const StPicoBTowHit
   Double_t energy = tower->energy();
   Double_t p = TMath::Sqrt(energy*energy - mass*mass);
   int towerID = tower->id();
+  if(towerID < 0) return kFALSE;
 
   // get tower position
-  StThreeVectorF towerPosition = Position->getPosFromVertex(mVertex, towerID);
+  StThreeVectorF towerPosition = mEmcPosition->getPosFromVertex(mVertex, towerID);
   double posX = towerPosition.x();
   double posY = towerPosition.y();
   double posZ = towerPosition.z();
@@ -2046,4 +2116,47 @@ void StJetMakerTaskBGsub::FillJetBGBranch()
      jetCount++;
    } // jet loop 
 
+}
+//
+// sets errors on histograms up before filling
+//________________________________________________________________________
+void StJetMakerTaskBGsub::SetSumw2() {
+  // set sum weights
+  fHistMultiplicity->Sumw2();
+  fHistCentrality->Sumw2();
+  fHistFJRho->Sumw2();
+
+  fHistNTrackvsPt->Sumw2();
+  fHistNTrackvsPhi->Sumw2();
+  fHistNTrackvsEta->Sumw2();
+  fHistNTrackvsPhivsEta->Sumw2();
+  fHistNTowervsID->Sumw2();
+  fHistNTowervsE->Sumw2();
+  fHistNTowervsEt->Sumw2();
+  fHistNTowervsPhi->Sumw2();
+  fHistNTowervsEta->Sumw2();
+  fHistNTowervsPhivsEta->Sumw2();
+
+  fHistJetNTrackvsPt->Sumw2();
+  fHistJetNTrackvsPhi->Sumw2();
+  fHistJetNTrackvsEta->Sumw2();
+  fHistJetNTrackvsPhivsEta->Sumw2();
+  fHistJetNTowervsID->Sumw2();
+  fHistJetNTowervsE->Sumw2();
+  fHistJetNTowervsEt->Sumw2();
+  fHistJetNTowervsPhi->Sumw2();
+  fHistJetNTowervsEta->Sumw2();
+  fHistJetNTowervsPhivsEta->Sumw2();
+
+  fHistNJetsvsPt->Sumw2();
+  fHistNJetsvsPhi->Sumw2();
+  fHistNJetsvsEta->Sumw2();
+  fHistNJetsvsPhivsEta->Sumw2();
+  fHistNJetsvsArea->Sumw2();
+  fHistNJetsvsNConstituents->Sumw2();
+  fHistNJetsvsNTracks->Sumw2();
+  fHistNJetsvsNTowers->Sumw2();
+
+  fHistQATowIDvsEta->Sumw2();
+  fHistQATowIDvsPhi->Sumw2();
 }

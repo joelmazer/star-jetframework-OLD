@@ -545,7 +545,7 @@ void StAnMaker::RunTowers()
   // looping over clusters - STAR: matching already done
   // get # of clusters and set variables
   unsigned int nBEmcPidTraits = mPicoDst->numberOfBEmcPidTraits();
-  StEmcPosition *mPosition = new StEmcPosition();
+  StEmcPosition2 *mPosition = new StEmcPosition2();
 
   // loop over ALL clusters in PicoDst and add to jet //TODO
   for(unsigned short iClus = 0; iClus < nBEmcPidTraits; iClus++){

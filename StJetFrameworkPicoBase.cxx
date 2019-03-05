@@ -46,12 +46,10 @@
 #include "StRoot/StRefMultCorr/StRefMultCorr.h"
 #include "StRoot/StRefMultCorr/CentralityMaker.h"
 
-
-#include "StEmcUtil/projection/StEmcPosition.h"
-class StEmcPosition;
-
-// classes
-//class StJetMakerTask;
+//#include "StEmcUtil/projection/StEmcPosition.h"
+//class StEmcPosition;
+#include "StEmcPosition2.h"
+class StEmcPosition2;
 
 ClassImp(StJetFrameworkPicoBase)
 
@@ -107,6 +105,7 @@ StJetFrameworkPicoBase::StJetFrameworkPicoBase() :
   RhoMaker1(0x0),
   RhoMaker2(0x0),
   EventPlaneMaker(0x0),
+  mEmcPosition(0x0),
   grefmultCorr(0x0),
   refmultCorr(0x0),
   refmult2Corr(0x0),
@@ -182,6 +181,7 @@ StJetFrameworkPicoBase::StJetFrameworkPicoBase(const char* name) :
   RhoMaker1(0x0),
   RhoMaker2(0x0),
   EventPlaneMaker(0x0),
+  mEmcPosition(0x0), 
   grefmultCorr(0x0),
   refmultCorr(0x0),
   refmult2Corr(0x0),
@@ -229,6 +229,8 @@ Int_t StJetFrameworkPicoBase::Init() {
         AddBadTowers("StRoot/StMyAnalysisMaker/towerLists/Y2016_BadTowers.txt");
         AddDeadTowers("StRoot/StMyAnalysisMaker/towerLists/Y2016_DeadTowers.txt");
         break;
+
+    // TODO - not sure, may want to add other runs? this base class may not be best place for reading in lists
 
     default :
       AddBadTowers("StRoot/StMyAnalysisMaker/towerLists/Empty_BadTowers.txt");
@@ -656,9 +658,9 @@ Bool_t StJetFrameworkPicoBase::AcceptTrack(StPicoTrack *trk, Float_t B, StThreeV
 //
 // Tower Quality Cuts
 //________________________________________________________________________
-Bool_t StJetFrameworkPicoBase::AcceptTower(StPicoBTowHit *tower, StThreeVectorF Vertex) {
+Bool_t StJetFrameworkPicoBase::AcceptTower(StPicoBTowHit *tower, StThreeVectorF Vertex, Int_t towerID) {
   // get EMCal position
-  StEmcPosition *mPosition = new StEmcPosition();
+  StEmcPosition2 *mPosition = new StEmcPosition2();
 
   // constants:
   double pi = 1.0*TMath::Pi();
@@ -671,6 +673,10 @@ Bool_t StJetFrameworkPicoBase::AcceptTower(StPicoBTowHit *tower, StThreeVectorF 
 
   // cluster and tower position - from vertex and ID: shouldn't need additional eta correction
   StThreeVectorF towerPosition = mPosition->getPosFromVertex(mVertex, towerID);
+
+  // free up memory
+  delete mPosition;
+
   double phi = towerPosition.phi();
   if(phi < 0)    phi += 2.0*pi;
   if(phi > 2*pi) phi -= 2.0*pi;
@@ -1256,7 +1262,7 @@ Bool_t StJetFrameworkPicoBase::CheckForHT(int RunFlag, int type) {
 //________________________________________________________________________________________________________
 Bool_t StJetFrameworkPicoBase::GetMomentum(StThreeVectorF &mom, const StPicoBTowHit* tower, Double_t mass, StPicoEvent *PicoEvent) const {
   // initialize Emc position objects
-  StEmcPosition *Position = new StEmcPosition();
+  StEmcPosition2 *Position = new StEmcPosition2();
 
   // vertex components
   StThreeVectorF fVertex = PicoEvent->primaryVertex();
@@ -1289,6 +1295,10 @@ Bool_t StJetFrameworkPicoBase::GetMomentum(StThreeVectorF &mom, const StPicoBTow
     mom.setZ( p*posZ/r );
     // energy) ;
   } else { return kFALSE; }
+
+  // free up memory
+  delete Position;
+
   return kTRUE;
 }
 
@@ -1462,23 +1472,45 @@ Double_t StJetFrameworkPicoBase::GetMaxTrackPt()
 
   return fMaxTrackPt;
 }
-/*
 //
+// Returns correction for tracking efficiency
 //
-//___________________________________________________________________________________________
-Bool_t StJetFrameworkPicoBase::DidTowerConstituentFireTrigger(StJet *jet) const {
-  // ==== 
+//Double_t StJetFrameworkPicoBase::ApplyTrackingEffpp(StPicoTrack *trk)
+//Double_t StJetFrameworkPicoBase::ApplyTrackingEffAuAu(StPicoTrack *trk)
+Double_t StJetFrameworkPicoBase::ApplyTrackingEff(StPicoTrack *trk, Bool_t applyEff)
+{
+  // initialize effieciency
+  double trEff = 1.0;
+  if(!applyEff) return trEff;
 
-  // loop over constituents towers
-  for(int itow = 0; itow < jet->GetNumberOfClusters(); itow++) {
-    int towerid = jet->ClusterAt(itow);
-    StPicoBTowHit *tow = static_cast<StPicoBTowHit*>(mPicoDst->btowHit(towerid));
-    if(!tow){ continue; }
+  // get momentum vector of track - global or primary track
+  StThreeVectorF mTrkMom;
+  if(doUsePrimTracks) {
+    // get primary track vector
+    mTrkMom = trk->pMom();
+  } else {
+    // get global track vector
+    mTrkMom = trk->gMom(mVertex, Bfield);
+  }
 
-    int towID = tow->id();
+  // track variables
+  double tpt = mTrkMom.perp();
+  double teta = mTrkMom.pseudoRapidity();
+  double tphi = mTrkMom.phi();
 
-  } // tower constituent loop
+  // track efficiency has pt and eta and centrality dependence 
+  //
+  // RunFlag switch
+  switch(fRunFlag) {
+    case StJetFrameworkPicoBase::Run14_AuAu200 : // Run14 AuAu
+        break;
 
+    case StJetFrameworkPicoBase::Run16_AuAu200 : // Run16 AuAu
+        break;
+
+  } // RunFlag switch
+
+  // return the single track reconstruction efficiency for the corresponding dataset
+  return trEff;
 }
 
-*/

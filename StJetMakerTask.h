@@ -10,12 +10,11 @@
 
 // for clusters
 #include "StEmcUtil/geometry/StEmcGeom.h"
-#include "StEmcUtil/projection/StEmcPosition.h"
+//#include "StEmcUtil/projection/StEmcPosition.h"
+//class StEmcPosition; // old
 #include "StMuDSTMaker/COMMON/StMuDst.h"
 class StEmcGeom;
-class StEmcCluster;
-class StEmcCollection;
-class StBemcTables; //v3.14
+class StEmcPosition2;
 
 // ROOT classes
 class TClonesArray;
@@ -30,7 +29,6 @@ class StPicoDstMaker;
 
 // Jet classes
 class StFJWrapper;
-class StJetUtility;
 
 // Centrality class
 class StRefMultCorr;
@@ -59,12 +57,6 @@ namespace fastjet {
  * to set a jet definition (jet algorithm, recombination scheme) and the
  * list of jet constituents. The jet finding is delegated to
  * the class StFJWrapper which implements an interface to FastJet.
- *
- * The below is not functional yet:
- * The FastJet contrib utilities are available via the StJetUtility base class
- * and its derived classes. Utilities can be added via the AddUtility(StJetUtility*) method.
- * All the utilities added in the list will be executed. Users can implement new utilities
- * deriving a new class from StJetUtility to interface functionalities of the FastJet contribs.
  */
 
 class StJetMakerTask : public StMaker {
@@ -163,10 +155,6 @@ class StJetMakerTask : public StMaker {
   void         SetLegacyMode(Bool_t mode)                 { fLegacyMode       = mode  ; }
   void         SetFillGhost(Bool_t b=kTRUE)               { fFillGhost        = b     ; }
 
-  // for jet substructure routines
-  StJetUtility*          AddUtility(StJetUtility* utility);
-  TObjArray*             GetUtilities()                   { return fUtilities ; }
-
   // jets
   TClonesArray*          GetJets()                        { return fJets; }
   TClonesArray*          GetJetsBGsub()                   { return fJetsBGsub; }
@@ -229,14 +217,13 @@ class StJetMakerTask : public StMaker {
   Bool_t                 DoComparison(int myarr[], int elems);
   void                   FillEmcTriggersArr();
   Double_t               GetMaxTrackPt();
+  void                   RunEventQA();
+  void                   SetSumw2(); // set errors weights 
+  Int_t                  GetRunNo(int runid);
 
   // may not need any of these except fill jet branch if I want 2 different functions
   void                   FillJetBranch();
   void                   FillJetBGBranch();
-  void                   InitUtilities();
-  void                   PrepareUtilities();
-  void                   ExecuteUtilities(StJet* jet, Int_t ij);
-  void                   TerminateUtilities();
 
   Bool_t                 GetSortedArray(Int_t indexes[], std::vector<fastjet::PseudoJet> array) const;
 
@@ -329,7 +316,6 @@ class StJetMakerTask : public StMaker {
   Float_t                mHadronicCorrFrac;       // hadronic correction fraction from 0.0 to 1.0
 
   // may not need some of next bools
-  TObjArray             *fUtilities;              // jet utilities (gen subtractor, constituent subtractor etc.)
   Bool_t                 fLocked;                 // true if lock is set
   Bool_t                 fIsInit;                 //!=true if already initialized
   Bool_t                 fLegacyMode;             //!=true to enable FJ 2.x behavior
@@ -355,6 +341,9 @@ class StJetMakerTask : public StMaker {
   StPicoDst      *mPicoDst;      // PicoDst object
   StPicoEvent    *mPicoEvent;    // PicoEvent object
 
+  // position objection
+  StEmcPosition2 *mEmcPosition; // Emc position object
+
   // centrality objects
   StRefMultCorr* grefmultCorr;
 
@@ -362,8 +351,22 @@ class StJetMakerTask : public StMaker {
   Bool_t         mTowerStatusArr[4801];
 
   // histograms
+  TH1F           *fHistMultiplicity;//!
   TH1F           *fHistCentrality;//!
   TH1F           *fHistFJRho;//!
+  TProfile       *fProfEventBBCx;//!
+  TProfile       *fProfEventZDCx;//!
+
+  TH1F           *fHistNTrackvsPt;//!
+  TH1F           *fHistNTrackvsPhi;//!
+  TH1F           *fHistNTrackvsEta;//!
+  TH2F           *fHistNTrackvsPhivsEta;//!
+  TH1F           *fHistNTowervsID;//!
+  TH1F           *fHistNTowervsE;//!
+  TH1F           *fHistNTowervsEt;//!
+  TH1F           *fHistNTowervsPhi;//!
+  TH1F           *fHistNTowervsEta;//!
+  TH2F           *fHistNTowervsPhivsEta;//!
 
   TH1F           *fHistJetNTrackvsPt;//!
   TH1F           *fHistJetNTrackvsPhi;//!

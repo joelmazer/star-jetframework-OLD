@@ -50,10 +50,7 @@
 #include "StRho.h"
 #include "StJetMakerTask.h"
 #include "StEventPoolManager.h"
-#include "StPicoTrk.h"
 #include "StFemtoTrack.h"
-#include "StEPFlattener.h"
-#include "StCalibContainer.h"
 #include "runlistP16ij.h"
 #include "runlistP17id.h" // SL17i - Run14, now SL18b (March20)
 
@@ -126,9 +123,6 @@ StMyAnalysisMaker::StMyAnalysisMaker(const char* name, StPicoDstMaker *picoMaker
   fPoolMgr = 0x0;
   fJets = 0x0;
   fRunNumber = 0;
-  fEPcalibFileName = "$STROOT_CALIB/eventplaneFlat.root"; 
-  fFlatContainer = 0x0;
-  fTPCnFlat = 0x0; fTPCpFlat = 0x0; fBBCFlat = 0x0; fZDCFlat = 0x0;
   fEPTPCn = 0.; fEPTPCp = 0.; fEPTPC = 0.; fEPBBC = 0.; fEPZDC = 0.;
   mPicoDstMaker = 0x0;
   mPicoDst = 0x0;
@@ -215,10 +209,6 @@ StMyAnalysisMaker::~StMyAnalysisMaker()
   delete fHistEPTPCp;
   delete fHistEPBBC;
   delete fHistEPZDC;
-  delete fHistEPTPCnFlatten;
-  delete fHistEPTPCpFlatten;
-  delete fHistEPBBCFlatten;
-  delete fHistEPZDCFlatten;
   delete hEventZVertex;
   delete hCentrality;
   delete hMultiplicity;
@@ -583,10 +573,6 @@ void StMyAnalysisMaker::DeclareHistograms() {
   fHistEPTPCp = new TH2F("fHistEPTPCp", "", 20, 0., 100., 72, -pi, pi);
   fHistEPBBC = new TH2F("fHistEPBBC", "", 20, 0., 100., 72, -pi, pi);
   fHistEPZDC = new TH2F("fHistEPZDC", "", 20, 0., 100., 72, -pi, pi);
-  fHistEPTPCnFlatten = new TH2F("fHistEPTPCnFlatten", "", 20, 0., 100., 72, -pi, pi);
-  fHistEPTPCpFlatten = new TH2F("fHistEPTPCpFlatten", "", 20, 0., 100., 72, -pi, pi);
-  fHistEPBBCFlatten = new TH2F("fHistEPBBCFlatten", "", 20, 0., 100., 72, -pi, pi);
-  fHistEPZDCFlatten = new TH2F("fHistEPZDCFlatten", "", 20, 0., 100., 72, -pi, pi);
   hEventZVertex = new TH1F("hEventZVertex", "z-vertex distribution", 100, -50, 50);
   hCentrality = new TH1F("hCentrality", "No. events vs centrality", 20, 0, 100); 
   hMultiplicity = new TH1F("hMultiplicity", "No. events vs multiplicity", 160, 0, 800);
@@ -936,12 +922,13 @@ void StMyAnalysisMaker::DeclareHistograms() {
   }
 
   // temp FIXME:  Currently 5% centrality bins 0-80%, 4cm z-vtx bins
+  // AuAu cent bins
   Int_t nCentBins = 16;
-  Double_t cenBins[] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16}; // TEST added 16
-  Double_t* centralityBin = cenBins;
+  Double_t* centralityBin = GenerateFixedBinArray(nCentBins, 0., 16.);
+
+  // z-vertex bins
   Int_t nZvBins  = 20; //10+1+10;
-  Double_t vBins[] = {-40,-36,-32,-28,-24,-20,-16,-12,-8,-4,0,4,8,12,16,20,24,28,32,36,40};
-  Double_t* zvbin = vBins;
+  Double_t* zvbin = GenerateFixedBinArray(nZvBins, -40., 40.);
 
   // Event Mixing
   Int_t trackDepth = fMixingTracks;
@@ -1013,10 +1000,6 @@ void StMyAnalysisMaker::WriteHistograms() {
   fHistEPTPCp->Write();
   fHistEPBBC->Write();
   fHistEPZDC->Write();
-  fHistEPTPCnFlatten->Write();
-  fHistEPTPCpFlatten->Write();
-  fHistEPBBCFlatten->Write();
-  fHistEPZDCFlatten->Write();
   hEventZVertex->Write();
   hCentrality->Write();
   hMultiplicity->Write();
@@ -1252,16 +1235,6 @@ Int_t StMyAnalysisMaker::Make() {
   double fZDCCoincidenceRate = mPicoEvent->ZDCx();
   if(fDebugLevel == kDebugGeneralEvt) cout<<"RunID = "<<RunId<<"  fillID = "<<fillId<<"  eventID = "<<eventId<<endl; // what is eventID?i
 
-  // ================= Event Plane flattening container ==============
-  // set up event plane flattening container - not currently used 
-  TObjArray *maps = static_cast<TObjArray*>(fFlatContainer->GetObject(fRunNumber,"eventplaneFlat"));
-  if(maps) {
-    fTPCnFlat = static_cast<StEPFlattener*>(maps->At(0));
-    fTPCpFlat = static_cast<StEPFlattener*>(maps->At(1));
-    fBBCFlat = static_cast<StEPFlattener*>(maps->At(2));
-    fZDCFlat = static_cast<StEPFlattener*>(maps->At(3));
-  }
-
   // ============================ CENTRALITY ============================== //
   // for only 14.5 GeV collisions from 2014 and earlier runs: refMult, for AuAu run14 200 GeV: grefMult 
   // https://github.com/star-bnl/star-phys/blob/master/StRefMultCorr/Centrality_def_refmult.txt
@@ -1348,6 +1321,9 @@ Int_t StMyAnalysisMaker::Make() {
   bool fHaveMB5event = CheckForMB(fRunFlag, StJetFrameworkPicoBase::kVPDMB5);
   bool fHaveMB30event = CheckForMB(fRunFlag, StJetFrameworkPicoBase::kVPDMB30);
   bool fHaveEmcTrigger = CheckForHT(fRunFlag, fEmcTriggerEventType);
+  bool fRunForMB = kFALSE;  // used to differentiate pp and AuAu
+  if(doppAnalysis)  fRunForMB = (fHaveMBevent) ? kTRUE : kFALSE;
+  if(!doppAnalysis) fRunForMB = (fHaveMB5event || fHaveMB30event) ? kTRUE : kFALSE;
 
   // switches for Jet and Event Plane analysis
   Bool_t doJetAnalysis = kFALSE; // set false by default
@@ -1356,7 +1332,6 @@ Int_t StMyAnalysisMaker::Make() {
   // switch on Run Flag to look for firing trigger specifically requested for given run period
   switch(fRunFlag) {
     case StJetFrameworkPicoBase::Run14_AuAu200 : // Run14 AuAu
-      //if(fEmcTriggerArr[fEmcTriggerEventType]) {
       if(fHaveEmcTrigger) {
         doJetAnalysis = kTRUE;
         doEPAnalysis = kTRUE;
@@ -1846,8 +1821,8 @@ Int_t StMyAnalysisMaker::Make() {
 
     // use only tracks from MB (and Semi-Central) events
     ///if(fMixingEventType) { //kMB) {
-    ////if(fHaveMB5event || fHaveMB30event) { // kMB5 or kMB30 (don't exclude HT)
-    //if((fHaveMB5event || fHaveMB30event) && (!fHaveEmcTrigger)) { // kMB5 or kMB30 - TODO probably want to use to use this line in future, may not matter
+    ////if(fRunForMB) { // kMB5 or kMB30 (don't exclude HT)
+    //if(fRunForMB && (!fHaveEmcTrigger)) { // kMB5 or kMB30 - TODO probably want to use to use this line in future, may not matter
     if(fHaveMBevent) { // kMB
       if(fDebugLevel == kDebugMixedEvents) cout<<"...MB event... update event pool"<<endl;
 
@@ -2378,18 +2353,13 @@ Bool_t StMyAnalysisMaker::AcceptTrack(StPicoTrack *trk, Float_t B, StThreeVector
   //double energy = 1.0*TMath::Sqrt(p*p + pi0mass*pi0mass);
   //short charge = trk->charge();
   double dca = (trk->dcaPoint() - mPicoEvent->primaryVertex()).mag();
+  //double dca = trk->gDCA(Vert).Mag();
   int nHitsFit = trk->nHitsFit();
   int nHitsMax = trk->nHitsMax();
   double nHitsRatio = 1.0*nHitsFit/nHitsMax;
 
-  // do pt cut here to accommadate either type of track
-  if(doUsePrimTracks) { // primary  track
-    if(pt < fTrackPtMinCut) return kFALSE;
-  } else { // global track
-    if(pt < fTrackPtMinCut) return kFALSE;
-  }
-
   // track pt, eta, phi cuts
+  if(pt < fTrackPtMinCut) return kFALSE;
   if(pt > fTrackPtMaxCut) return kFALSE; // 20.0 STAR -> 30.0 GeV, 100.0 ALICE
   if((eta < fTrackEtaMinCut) || (eta > fTrackEtaMaxCut)) return kFALSE;
   if(phi < 0) phi+= 2*pi;
@@ -2817,10 +2787,6 @@ void StMyAnalysisMaker::SetSumw2() {
   fHistEPTPCp->Sumw2();
   fHistEPBBC->Sumw2();
   fHistEPZDC->Sumw2();
-  fHistEPTPCnFlatten->Sumw2();
-  fHistEPTPCpFlatten->Sumw2();
-  fHistEPBBCFlatten->Sumw2();
-  fHistEPZDCFlatten->Sumw2();
   //hEventZVertex->Sumw2();
   //hCentrality->Sumw2();
   //hMultiplicity->Sumw2();
@@ -3000,44 +2966,7 @@ void StMyAnalysisMaker::SetEPSumw2() {
 // __________________________________________________________________________________
 void StMyAnalysisMaker::InitParameters()
 {
-  //AddToHistogramsName("Flow_");
-  // FIXME update this!
-  fFlatContainer = new StCalibContainer("eventplaneFlat");
-  fFlatContainer->InitFromFile("$STROOT_CALIB/eventplaneFlat.root", "eventplaneFlat");
 }  
-
-// TPC negative eta region event plane flattening
-// __________________________________________________________________________________
-Double_t StMyAnalysisMaker::ApplyFlatteningTPCn(Double_t phi, Double_t c)
-{
-  if (fTPCnFlat) return fTPCnFlat->MakeFlat(phi,c);
-  return phi;
-}
-
-// TPC positive eta region event plane flattening
-// __________________________________________________________________________________
-Double_t StMyAnalysisMaker::ApplyFlatteningTPCp(Double_t phi, Double_t c)
-{ 
-  if (fTPCpFlat) return fTPCpFlat->MakeFlat(phi,c);
-  return phi;
-}
-
-// BBC event plane flattening
-// __________________________________________________________________________________
-Double_t StMyAnalysisMaker::ApplyFlatteningBBC(Double_t phi, Double_t c)
-{
-  if (fBBCFlat) return fBBCFlat->MakeFlat(phi,c);
-  return phi;
-}
-
-// ZDC event plane flattening
-// __________________________________________________________________________________
-Double_t StMyAnalysisMaker::ApplyFlatteningZDC(Double_t phi, Double_t c)
-{
-  if (fZDCFlat) return fZDCFlat->MakeFlat(phi,c);
-  return phi;
-}
-
 // ________________________________________________________________________________________
 void StMyAnalysisMaker::GetEventPlane(Bool_t flattenEP, Int_t n, Int_t method, Double_t ptcut, Int_t ptbin)
 { 
@@ -3272,24 +3201,6 @@ void StMyAnalysisMaker::GetEventPlane(Bool_t flattenEP, Int_t n, Int_t method, D
   fHistEPTPCp->Fill(fCentralityScaled, fEPTPCp);
   fHistEPBBC->Fill(fCentralityScaled, fEPBBC);
   fHistEPZDC->Fill(fCentralityScaled, fEPZDC);
-
-  // if we want to flatten event plane
-  if(flattenEP) {
-    fEPTPCn = ApplyFlatteningTPCn(fEPTPCn, fCentralityScaled);
-    fEPTPCp = ApplyFlatteningTPCp(fEPTPCp, fCentralityScaled);
-    fEPBBC = ApplyFlatteningBBC(fEPBBC, fCentralityScaled);
-    fEPZDC = ApplyFlatteningZDC(fEPZDC, fCentralityScaled);
-    //if (fEPTPC != -999.) fEPTPC = ApplyFlatteningTPC(fEPTPC, fCentralityScaled);
-    while (fEPTPCn<0.) fEPTPCn+=TMath::Pi(); while (fEPTPCn>TMath::Pi()) fEPTPCn-=TMath::Pi();
-    while (fEPTPCp<0.) fEPTPCp+=TMath::Pi(); while (fEPTPCp>TMath::Pi()) fEPTPCp-=TMath::Pi();
-    while (fEPBBC<0.)  fEPBBC+=TMath::Pi();  while (fEPBBC>TMath::Pi())  fEPBBC-=TMath::Pi();
-    while (fEPZDC<0.)  fEPZDC+=TMath::Pi();  while (fEPZDC>TMath::Pi())  fEPZDC-=TMath::Pi();
-
-    fHistEPTPCnFlatten->Fill(fCentralityScaled, fEPTPCn);
-    fHistEPTPCpFlatten->Fill(fCentralityScaled, fEPTPCp);
-    fHistEPBBCFlatten->Fill(fCentralityScaled, fEPBBC);
-    fHistEPZDCFlatten->Fill(fCentralityScaled, fEPZDC);
-  }
 
 }
 
