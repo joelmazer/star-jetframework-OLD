@@ -248,6 +248,7 @@ class StEventPlaneMaker : public StJetFrameworkPicoBase {
 
     // histograms
     TH1F* hCentrality;//!
+    TH1F* hCentralityEP;//!
     TH1F* hEventPlane;//!   
     TH1F* hEventPlaneWeighted;//!
     TH2F* fHistEPTPCn;//!
