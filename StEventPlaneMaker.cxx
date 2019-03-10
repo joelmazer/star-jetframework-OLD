@@ -558,7 +558,7 @@ void StEventPlaneMaker::DeclareHistograms() {
   Psi2m = new TH1F("Psi2m", "minus eta raw #Psi_{2} distribution", 144, 0., 1.*pi);
   Psi2p = new TH1F("Psi2p", "positive eta raw #Psi_{2} distribution", 144, 0., 1.*pi);
   Delta_Psi2 = new TH1F("Delta_Psi2", "#Delta #Psi_{2} distribution", 144, -1.*pi, 1.*pi);
-  Delta_Psi2cyc = new TH1F("Delta_Psi2", "#Delta #Psi_{2} distribution", 144, -0.5*pi, 0.5*pi);
+  Delta_Psi2cyc = new TH1F("Delta_Psi2cyc", "#Delta #Psi_{2} distribution", 144, -0.5*pi, 0.5*pi);
   Delta_Psi2old = new TH1F("Delta_Psi2old", "#Delta #Psi_{2} distribution - old", 144, 0., 1.*pi);
   Shift_delta_psi2 = new TH1F("Shift_delta_psi2", "shift_delta_psi2 distribution", 4000, -8*pi, 8*pi);
   Psi2_rcd = new TH1F("Psi2_rcd", "recentered #Psi_{2} distribution", 144, 0., 1*pi);
@@ -2185,8 +2185,14 @@ Int_t StEventPlaneMaker::EventPlaneCal(int ref9, int region_vz, int n, int ptbin
   Psi2_rcd->Fill(tPhi_rcd);      // recentered psi2
   Delta_Psi2->Fill(psi2m-psi2p); // raw delta psi2 - full range
   Delta_Psi2old->Fill(psi2m-psi2p); // raw delta psi2 - old
-  //double deltaPsi2 = psi2m-psi2p;
 
+  // sanity check when doing unfolding - create angular difference [-pi/2, pi/2] - this will restrict the max range when used for smearing
+  double deltaPsi2 = psi2m-psi2p; // angles from [0, pi]
+  if(deltaPsi2 >  0.5*pi) deltaPsi2 = pi - deltaPsi2;
+  if(deltaPsi2 < -0.5*pi) deltaPsi2 = pi + deltaPsi2;
+  Delta_Psi2cyc->Fill(deltaPsi2);
+
+  // used for resolution calculation
   double t_res = cos(2*(psi2m - psi2p)); // added
   res = 2.*(cos(2*(psi2m - psi2p)));
   RES = res;

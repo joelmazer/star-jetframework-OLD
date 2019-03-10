@@ -3284,12 +3284,15 @@ Int_t StMyAnalysisMaker3::JetShapeAnalysis(StJet *jet, StEventPool *pool, Double
     // assign global event plane to selected pt-dependent bin
     // could also write this as:  tpc2EP_bin = (EventPlaneMaker) ? (double)EventPlaneMaker->GetTPCEP() : -999;
     double tpc2EP = (EventPlaneMaker[EPBinToUse]) ? (double)EventPlaneMaker[EPBinToUse]->GetTPCEP() : -999;
-    double jetV2EP = (EventPlaneMaker[4]) ? (double)EventPlaneMaker[4]->GetTPCEP() : -999;
+    double jetV2EP = (EventPlaneMaker[EPBinToUse]) ? (double)EventPlaneMaker[EPBinToUse]->GetTPCEP() : -999;
 
-    // if requiring a single event plane angle (non-pt dependent): use charged tracks 0.2-2.0 GeV to calculat EP
+    // if requiring a single event plane angle (non-pt dependent): use charged tracks 0.2-2.0 GeV to calculate EP
     if(doUseMainEPAngle) {
       tpc2EP = (EventPlaneMaker[4]) ? (double)EventPlaneMaker[4]->GetTPCEP() : -999;
+      jetV2EP = (EventPlaneMaker[4]) ? (double)EventPlaneMaker[4]->GetTPCEP() : -999;
     }
+
+    //cout<<"assocPtBin: "<<assocPtBin<<"  tpc2EP: "<<tpc2EP<<"  jetV2EP: "<<jetV2EP<<endl;
 
     // get relative angle between jet and event plane
     double dEP = (!doppAnalysis) ? RelativeEPJET(jetPhi, tpc2EP) : -99.; // CORRECTED event plane angle - STEP3
@@ -3301,8 +3304,9 @@ Int_t StMyAnalysisMaker3::JetShapeAnalysis(StJet *jet, StEventPool *pool, Double
     // calculate jet v2 here, can move around for other analysis, but here for now
     // jetPtr, EPangle, ptBin
     // only calculate and fill jet v2 for assocPtBin == 0 for now - TODO
-//    if(assocPtBin == 0) GetJetV2(jet, tpc2EP, 1);
-    if(assocPtBin == 0 ) GetJetV2(jet, jetV2EP, 1); 
+    //    if(assocPtBin == 0) GetJetV2(jet, tpc2EP, 1);
+    //if(assocPtBin == 0 ) GetJetV2(jet, jetV2EP, 1); 
+    GetJetV2(jet, jetV2EP, assocPtBin);
     // ==========================================================================================================================
 
     // annuli sum - initialize
