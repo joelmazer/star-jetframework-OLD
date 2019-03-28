@@ -136,6 +136,7 @@ class StMyAnalysisMaker3 : public StJetFrameworkPicoBase {
     virtual void            SetReduceStatsCent(Int_t red)      { fReduceStatsCent = red; }
     virtual void            SetDoFilterPtMixEvents(Bool_t fil) { fDoFilterPtMixEvents = fil; }
     virtual void            SetDoUseMultBins(Bool_t mult)      { fDoUseMultBins = mult; }
+    virtual void            SetdoUseEPBins(Bool_t ep)          { doUseEPBins = ep; }
 
     // event selection - setters
     virtual void            SetEmcTriggerEventType(UInt_t te)  { fEmcTriggerEventType = te; }
@@ -180,7 +181,6 @@ class StMyAnalysisMaker3 : public StJetFrameworkPicoBase {
     Bool_t                  DidTowerConstituentFireTrigger(StJet *jet);
     Bool_t                  DidBadTowerFireTrigger();
     Double_t                GetDeltaR(StJet *jet, StPicoTrack *trk);
-    ///Int_t                   JetShapeAnalysis(StJet *jet, StEventPool *pool, Double_t refCorr2);
     Int_t                   JetShapeAnalysis(StJet *jet, StEventPool *pool, Double_t refCorr2, Int_t assocPtBin);
     Double_t                TestBool();
     void                    GetJetV2(StJet *jet, Double_t EPangle, Int_t ptAssocBin);
@@ -220,6 +220,7 @@ class StMyAnalysisMaker3 : public StJetFrameworkPicoBase {
     Int_t          fReduceStatsCent;            // bins to use for reduced statistics of sparse
     Bool_t         fDoFilterPtMixEvents;        // filter mixed event pool by pt (reduce memory) switch
     Bool_t         fDoUseMultBins;              // use multiplicity bins instead of centrality bins - used for Jet Shape Analysis
+    Bool_t         doUseEPBins;                // use event plane bins
 
     // event selection types
     UInt_t         fEmcTriggerEventType;        // Physics selection of event used for signal
@@ -371,15 +372,6 @@ class StMyAnalysisMaker3 : public StJetFrameworkPicoBase {
     TH2F *hBBCvsZDCep;//!
 
     // jet shape histos - in jetpt and centrality arrays
-/*
-    TH1F *hJetShape[4][4][4];//! jet shape histograms in annuli bins
-    TH1F *hJetShapeCase1[4][4][4];//! jet shape case1 histograms in annuli bins
-    TH1F *hJetShapeCase2[4][4][4];//! jet shape case2 histograms in annuli bins
-    TH1F *hJetShapeBG[4][4][4];//! jet shape backround histograms in annuli bins
-    TH1F *hJetShapeBGCase1[4][4][4];//! jet shape case1 histograms in annuli bins
-    TH1F *hJetShapeBGCase2[4][4][4];//! jet shape case2 histograms in annuli bins
-    TH1F *hJetShapeBGCase3[4][4][4];//! jet shape case3 histograms in annuli bins
-*/
     TH1F *hJetShape[4][4][4][9];//! jet shape histograms in annuli bins
     TH1F *hJetShapeCase1[4][4][4][9];//! jet shape case1 histograms in annuli bins
     TH1F *hJetShapeCase2[4][4][4][9];//! jet shape case2 histograms in annuli bins
@@ -393,15 +385,6 @@ class StMyAnalysisMaker3 : public StJetFrameworkPicoBase {
     TH1F *hJetCounterCase3BG[4][4][4];//! jet shape and pt profile case3 histograms - jet counter FOR BG only!
 
     // jet pt profile histos - in jetpt and centrality arrays
-/*
-    TH1F *hJetPtProfile[4][4][4];//! jet pt profile histograms in annuli bins
-    TH1F *hJetPtProfileCase1[4][4][4];//! jet pt profile case1 histograms in annuli bins
-    TH1F *hJetPtProfileCase2[4][4][4];//! jet pt profile case2 histograms in annuli bins
-    TH1F *hJetPtProfileBG[4][4][4];//! jet pt profile backround histograms in annuli bins
-    TH1F *hJetPtProfileBGCase1[4][4][4];//! jet profile case1 histograms in annuli bins
-    TH1F *hJetPtProfileBGCase2[4][4][4];//! jet profile case2 histograms in annuli bins
-    TH1F *hJetPtProfileBGCase3[4][4][4];//! jet profile case3 histograms in annuli bins
-*/
     TH1F *hJetPtProfile[4][4][4][9];//! jet pt profile histograms in annuli bins
     TH1F *hJetPtProfileCase1[4][4][4][9];//! jet pt profile case1 histograms in annuli bins
     TH1F *hJetPtProfileCase2[4][4][4][9];//! jet pt profile case2 histograms in annuli bins

@@ -30,6 +30,8 @@ class StJetMakerTask;
 class StJet;
 class StRho;
 class StRhoParameter;
+class StCalibContainer;
+class StEPFlattener;
 
 //class StEventPlaneMaker : public StMaker {
 class StEventPlaneMaker : public StJetFrameworkPicoBase {
@@ -77,6 +79,9 @@ class StEventPlaneMaker : public StJetFrameworkPicoBase {
     void    DeclareHistograms();
     void    WriteEventPlaneHistograms();
 
+    // ep stuff - Nov15
+    void    InitParameters();
+   
     // THnSparse Setup
     virtual THnSparse*      NewTHnSparseEP(const char* name, UInt_t entries);
     virtual void            GetDimParamsEP(Int_t iEntry,TString &label, Int_t &nbins, Double_t &xmin, Double_t &xmax);
@@ -143,6 +148,7 @@ class StEventPlaneMaker : public StJetFrameworkPicoBase {
     // Where to read calib object with EP calibration if not default
     void                    SetEPcalibFileName(TString filename)            {fEPcalibFileName = filename; } 
     void                    SetOutFileNameEP(TString epout)                 {mOutNameEP = epout; }
+    virtual void            SetdoReadCalibFile(Bool_t rc)                   {doReadCalibFile = rc; } 
 
     // get functions:
     Double_t                GetTPCEP()                { return TPC_PSI2; }
@@ -177,6 +183,7 @@ class StEventPlaneMaker : public StJetFrameworkPicoBase {
     Bool_t                 doEventPlaneRes;         // event plane resolution switch
     Bool_t                 doTPCptassocBin;         // TPC event plane calculated on a pt assoc bin basis
     Int_t                  fTPCptAssocBin;          // pt associated bin to calculate event plane for
+    Bool_t                 doReadCalibFile;         // read calibration file switch
 
     // event selection types
     UInt_t         fEmcTriggerEventType;        // Physics selection of event used for signal
@@ -232,8 +239,18 @@ class StEventPlaneMaker : public StJetFrameworkPicoBase {
     Double_t       ZDC_raw_west;
 
   private:
+    Double_t               ApplyFlatteningTPCn(Double_t phi, Double_t c);
+    Double_t               ApplyFlatteningTPCp(Double_t phi, Double_t c);
+    Double_t               ApplyFlatteningBBC(Double_t phi, Double_t c);
+    Double_t               ApplyFlatteningZDC(Double_t phi, Double_t c);
+
     Int_t                  fRunNumber;
     TString                fEPcalibFileName; 
+    StCalibContainer      *fFlatContainer;
+    StEPFlattener         *fTPCnFlat;
+    StEPFlattener         *fTPCpFlat;
+    StEPFlattener         *fBBCFlat;
+    StEPFlattener         *fZDCFlat;
     Double_t               fEPTPCResolution;
     Double_t               fEPTPCn;
     Double_t               fEPTPCp;
@@ -255,6 +272,10 @@ class StEventPlaneMaker : public StJetFrameworkPicoBase {
     TH2F* fHistEPTPCp;//!
     TH2F* fHistEPBBC;//!
     TH2F* fHistEPZDC;//!
+    TH2F* fHistEPTPCnFlatten;//!
+    TH2F* fHistEPTPCpFlatten;//!
+    TH2F* fHistEPBBCFlatten;//!
+    TH2F* fHistEPZDCFlatten;//!
     TH1F* hTrackPhi[9];//!
     TH1F* hTrackPt[9];//!
 

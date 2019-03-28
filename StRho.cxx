@@ -11,6 +11,7 @@
 #include <TMath.h>
 #include "TH2.h"
 #include "TH2F.h"
+#include "TVector3.h"
 
 class TH2;
 class TH2F;
@@ -21,7 +22,7 @@ class TH2F;
 #include "StJetMakerTask.h"
 
 // STAR includes
-#include "StRoot/StPicoDstMaker/StPicoDst.h"
+#include "StRoot/StPicoEvent/StPicoDst.h"
 #include "StRoot/StPicoDstMaker/StPicoDstMaker.h"
 #include "StRoot/StPicoEvent/StPicoTrack.h"
 
@@ -173,7 +174,7 @@ Int_t StRho::Make()
   if(GetMaxTrackPt() > fMaxEventTrackPt) return kStOK;
 
   // get vertex 3 vector and declare variables
-  StThreeVectorF mVertex = mPicoEvent->primaryVertex();
+  TVector3 mVertex = mPicoEvent->primaryVertex();
   double zVtx = mVertex.z();
 
   // z-vertex cut - per the Aj analysis (-40, 40) for reference
@@ -227,10 +228,7 @@ Int_t StRho::Make()
   }
 
   // cut on unset centrality, > 80%
-  if(cent16 == -1) { 
-    cout<<"cent16 == -1, warning!"<<endl;
-    return kStWarn; // maybe kStOk; - this is for lowest multiplicity events 80%+ centrality, cut on them
-  }
+  if(cent16 == -1) return kStWarn; // maybe kStOk; - this is for lowest multiplicity events 80%+ centrality, cut on them
 
   // cut on centrality for analysis before doing anything
   if(fRequireCentSelection) { if(!SelectAnalysisCentralityBin(centbin, fCentralitySelectionCut)) return kStOk; }
