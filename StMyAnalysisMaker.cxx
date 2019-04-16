@@ -51,8 +51,10 @@
 #include "StJetMakerTask.h"
 #include "StEventPoolManager.h"
 #include "StFemtoTrack.h"
+#include "runlistP12id.h" // Run12 pp
 #include "runlistP16ij.h"
 #include "runlistP17id.h" // SL17i - Run14, now SL18b (March20)
+#include "runlistRun14AuAu_P18ih.h" // new Run14 AuAu
 
 // include header that has all the event plane correction headers - with calibration/correction values
 #include "StPicoEPCorrectionsIncludes.h"
@@ -1774,7 +1776,8 @@ Int_t StMyAnalysisMaker::Make() {
 
             // loop over background (mixed event) tracks
             for(int ibg = 0; ibg < Nbgtrks; ibg++) {
-              // slimmed PicoTrack class
+              // trying new slimmed PicoTrack class
+              //StPicoTrk* trk = (StPicoTrk*)bgTracks->At(ibg);
               StFemtoTrack* trk = static_cast<StFemtoTrack*>(bgTracks->At(ibg));
               if(!trk){ continue; }
               double Mixphi = trk->Phi();

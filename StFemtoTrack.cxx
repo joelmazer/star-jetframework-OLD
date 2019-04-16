@@ -20,7 +20,8 @@
 
 #include "StVParticle.h"
 #include "StThreeVectorF.hh"
-#include "StRoot/StPicoEvent/StPicoTrack.h"
+//#include "StRoot/StPicoEvent/StPicoTrack.h"
+#include "StPicoEvent/StPicoTrack.h"
 
 #include "Riostream.h"
 /// \cond CLASSIMP

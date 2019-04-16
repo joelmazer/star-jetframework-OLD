@@ -31,7 +31,7 @@ class StFemtoTrack : public TObject //public StMaker //public StVParticle // FIX
   StFemtoTrack(const StFemtoTrack &t);
   StFemtoTrack& operator=(const StFemtoTrack &t);
   virtual ~StFemtoTrack();
-  friend std::ostream &operator<<(std::ostream &in, const StFemtoTrack &t);
+  //friend std::ostream &operator<<(std::ostream &in, const StFemtoTrack &t);
 
   // Implementation of StVParticle interface //FIXME
   Double_t          Px()                         const { return fPt*TMath::Cos(fPhi) ; }
@@ -63,9 +63,9 @@ class StFemtoTrack : public TObject //public StMaker //public StVParticle // FIX
 
  private:
   /// \cond CLASSIMP
-  ClassDef(StFemtoTrack,1);
+  ClassDef(StFemtoTrack,1)
   /// \endcond
 };
 
-std::ostream &operator<<(std::ostream &in, const StFemtoTrack &t);
+//std::ostream &operator<<(std::ostream &in, const StFemtoTrack &t);
 #endif
